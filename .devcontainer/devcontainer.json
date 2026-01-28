@@ -1,0 +1,12 @@
+{
+  "name": "Portxlpy Seminar",
+  "dockerComposeFile": "docker-compose.yml",
+  "service": "seminar",
+  "workspaceFolder": "/workspace",
+  "overrideCommand": false,
+  "remoteUser": "root",
+  "postCreateCommand": "pytest -q || true",
+  "extensions": ["ms-python.python","esbenp.prettier-vscode"],
+  "settings": { "remote.autoForwardPorts": false },
+  "portsAttributes": { "4594": { "onAutoForward": "ignore" } }
+}

@@ -1,0 +1,9 @@
+Name,Value
+InterestRate,0.0175
+MortalityTable,DAV1994_T
+alpha,0.025
+beta1,0.025
+gamma1,0.0008
+gamma2,0.00125
+gamma3,0.0025
+k,24.0

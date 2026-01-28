@@ -1,0 +1,12 @@
+Attribute VB_Name = "mConstants"
+Public Const round_lx As Integer = 16
+Public Const round_tx As Integer = 16
+Public Const round_Dx As Integer = 16
+Public Const round_Cx As Integer = 16
+Public Const round_Nx As Integer = 16
+Public Const round_Mx As Integer = 16
+Public Const round_Rx As Integer = 16
+Public Const max_Age As Integer = 123
+
+
+
