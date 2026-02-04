@@ -1,0 +1,10 @@
+name: portxlpy
+services:
+  seminar:
+    image: ghcr.io/bartlmac/portxlpy:seminar-test3
+    container_name: portxlpy-seminar
+    # Container wach halten (kein Browser nötig)
+    entrypoint: ["/bin/bash", "-lc", "tail -f /dev/null"]
+    # WICHTIG: Kein Workspace-Volume setzen – das mountet Dev Containers automatisch.
+    volumes:
+      - ..:/workspace:cached

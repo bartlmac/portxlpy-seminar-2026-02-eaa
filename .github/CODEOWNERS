@@ -1,0 +1,3 @@
+# CODEOWNERS
+# Jede Änderung im Repo muss von Arno oder Bartek reviewt werden.
+*    @arnorasch @bartlmac

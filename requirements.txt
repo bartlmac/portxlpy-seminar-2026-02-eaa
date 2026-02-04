@@ -1,0 +1,10 @@
+# === Runtime dependencies ===
+pandas==2.2.2
+xlwings==0.30.12                  # benötigt nur von Bartek
+oletools==0.60.1                  # benötigt nur von Bartek
+openpyxl==3.1.3                   # benötigt nur von Arno
+
+# ─────── Tests & Reports ───────
+pytest==8.2.2
+junit2html==31.0.2       # XML → HTML-Dashboard bei Bedarf
+pytest-html==4.1.1       # HTML-Report direkt beim Testlauf

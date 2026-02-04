@@ -1,0 +1,346 @@
+Attribute VB_Name = "mCommValues"
+
+Dim cache As Object
+
+Public Sub InitializeCache()
+    ' Create a new Dictionary object
+    Set cache = CreateObject("Scripting.Dictionary")
+End Sub
+
+
+Public Function Act_qx(Age As Integer, Sex As String, TableId As String, Optional BirthYear As Integer, Optional RetirementAge As Integer, Optional Layer As Integer = 1) As Double
+    Dim ws As Worksheet
+    Dim tableVector As String
+    
+    Set ws = ThisWorkbook.Worksheets("MortalityTables")
+    If UCase(Sex) <> "M" Then Sex = "F"
+    
+    Select Case UCase(TableId)    ' Check whether the table string is implemented at all
+        ' The complete list of all implemented tables must be specified here
+        Case "DAV1994_T", "DAV2008_T"
+            tableVector = UCase(TableId) & "_" & Sex
+            Act_qx = WorksheetFunction.Index(ws.Range("m_Tables"), Age + 1, WorksheetFunction.Match(tableVector, ws.Range("v_Tables"), 0))
+        Case Else
+            Act_qx = 1#
+            Error (1)
+    End Select
+End Function
+
+
+Private Function Vec_lx(EndAge As Integer, Sex As String, TableId As String, Optional BirthYear As Integer, Optional RetirementAge As Integer, Optional Layer As Integer = 1) As Variant
+    ' Creates vector of lx
+    ' If EndAge = -1 then it is created up to max_Age
+    Dim vec() As Variant
+    Dim i As Integer
+    Dim limit As Integer
+
+    If EndAge = -1 Then
+        limit = max_Age
+    Else
+        limit = EndAge
+    End If
+
+    ReDim vec(limit)
+
+    vec(0) = 1000000
+    For i = 1 To limit
+        vec(i) = vec(i - 1) * (1 - Act_qx(i - 1, Sex, TableId, BirthYear, RetirementAge, Layer))
+        vec(i) = WorksheetFunction.Round(vec(i), round_lx)
+    Next i
+
+    Vec_lx = vec()
+End Function
+
+Public Function Act_lx(Age As Integer, Sex As String, TableId As String, Optional BirthYear As Integer, Optional RetirementAge As Integer, Optional Layer As Integer = 1) As Double
+    Dim vec As Variant
+    
+    vec = Vec_lx(Age, Sex, TableId, BirthYear, RetirementAge, Layer)
+    Act_lx = vec(Age)
+End Function
+
+
+Private Function Vec_tx(EndAge As Integer, Sex As String, TableId As String, Optional BirthYear As Integer, Optional RetirementAge As Integer, Optional Layer As Integer = 1) As Variant
+    ' Creates vector of tx (# deaths)
+    Dim vec() As Variant
+    Dim i As Integer
+    Dim limit As Integer
+    
+    If EndAge = -1 Then
+        limit = max_Age
+    Else
+        limit = EndAge
+    End If
+    
+    ReDim vec(limit)
+    
+    Dim tempLx As Variant
+    tempLx = Vec_lx(limit, Sex, TableId, BirthYear, RetirementAge, Layer)
+        
+    For i = 0 To limit - 1
+        vec(i) = tempLx(i) - tempLx(i + 1)
+        vec(i) = WorksheetFunction.Round(vec(i), round_tx)
+    Next i
+    
+    Vec_tx = vec()
+End Function
+
+Public Function Act_tx(Age As Integer, Sex As String, TableId As String, Optional BirthYear As Integer, Optional RetirementAge As Integer, Optional Layer As Integer = 1) As Double
+    Dim vec As Variant
+    vec = Vec_tx(Age, Sex, TableId, BirthYear, RetirementAge, Layer)
+    Act_tx = vec(Age)
+End Function
+
+
+Private Function Vec_Dx(EndAge As Integer, Sex As String, TableId As String, InterestRate As Double, Optional BirthYear As Integer, Optional RetirementAge As Integer, Optional Layer As Integer = 1) As Variant
+    ' Creates vector of Dx
+    Dim vec() As Variant
+    Dim i As Integer
+    Dim limit As Integer
+    
+    If EndAge = -1 Then
+        limit = max_Age
+    Else
+        limit = EndAge
+    End If
+    
+    ReDim vec(limit)
+    
+    Dim v As Double
+    v = 1 / (1 + InterestRate)
+    
+    Dim tempLx As Variant
+    tempLx = Vec_lx(limit, Sex, TableId, BirthYear, RetirementAge, Layer)
+            
+    For i = 0 To limit
+        vec(i) = tempLx(i) * v ^ i
+        vec(i) = WorksheetFunction.Round(vec(i), round_Dx)
+    Next i
+    
+    Vec_Dx = vec()
+End Function
+
+Public Function Act_Dx(Age As Integer, Sex As String, TableId As String, InterestRate As Double, Optional BirthYear As Integer, Optional RetirementAge As Integer, Optional Layer As Integer = 1) As Double
+    ' Check whether the dictionary is initialized
+    If cache Is Nothing Then
+        Call InitializeCache
+    End If
+    
+    Dim key As String
+    key = BuildCacheKey("Dx", Age, Sex, TableId, InterestRate, BirthYear, RetirementAge, Layer)
+    
+    ' Check whether the value is already cached
+    If cache.Exists(key) Then
+        Act_Dx = cache(key)
+    Else
+        Dim vec As Variant
+        vec = Vec_Dx(Age, Sex, TableId, InterestRate, BirthYear, RetirementAge, Layer)
+        Act_Dx = vec(Age)
+        
+        ' Store result in cache
+        cache.Add key, Act_Dx
+    End If
+End Function
+
+
+Private Function Vec_Cx(EndAge As Integer, Sex As String, TableId As String, InterestRate As Double, Optional BirthYear As Integer, Optional RetirementAge As Integer, Optional Layer As Integer = 1) As Variant
+    ' Creates vector of Cx
+    Dim vec() As Variant
+    Dim i As Integer
+    Dim limit As Integer
+    
+    If EndAge = -1 Then
+        limit = max_Age
+    Else
+        limit = EndAge
+    End If
+    
+    ReDim vec(limit)
+    
+    Dim v As Double
+    v = 1 / (1 + InterestRate)
+    
+    Dim tempTx As Variant
+    tempTx = Vec_tx(limit, Sex, TableId, BirthYear, RetirementAge, Layer)
+            
+    For i = 0 To limit - 1
+        vec(i) = tempTx(i) * v ^ (i + 1)
+        vec(i) = WorksheetFunction.Round(vec(i), round_Cx)
+    Next i
+    
+    Vec_Cx = vec()
+End Function
+
+Public Function Act_Cx(Age As Integer, Sex As String, TableId As String, InterestRate As Double, Optional BirthYear As Integer, Optional RetirementAge As Integer, Optional Layer As Integer = 1) As Double
+    ' Check whether the dictionary is initialized
+    If cache Is Nothing Then
+        Call InitializeCache
+    End If
+    
+    Dim key As String
+    key = BuildCacheKey("Cx", Age, Sex, TableId, InterestRate, BirthYear, RetirementAge, Layer)
+    
+    ' Check whether the value is already cached
+    If cache.Exists(key) Then
+        Act_Cx = cache(key)
+    Else
+        Dim vec As Variant
+        vec = Vec_Cx(Age, Sex, TableId, InterestRate, BirthYear, RetirementAge, Layer)
+        Act_Cx = vec(Age)
+        
+        ' Store result in cache
+        cache.Add key, Act_Cx
+    End If
+End Function
+
+
+Private Function Vec_Nx(Sex As String, TableId As String, InterestRate As Double, Optional BirthYear As Integer, Optional RetirementAge As Integer, Optional Layer As Integer = 1) As Variant
+    ' Creates vector of Nx
+    Dim vec() As Variant
+    Dim i As Integer
+    ReDim vec(max_Age)
+    
+    Dim tempDx As Variant
+    tempDx = Vec_Dx(-1, Sex, TableId, InterestRate, BirthYear, RetirementAge, Layer)
+            
+    vec(max_Age) = tempDx(max_Age)
+    For i = max_Age - 1 To 0 Step -1
+        vec(i) = vec(i + 1) + tempDx(i)
+        vec(i) = WorksheetFunction.Round(vec(i), round_Dx) ' kept as in original
+    Next i
+    
+    Vec_Nx = vec()
+End Function
+
+Public Function Act_Nx(Age As Integer, Sex As String, TableId As String, InterestRate As Double, Optional BirthYear As Integer, Optional RetirementAge As Integer, Optional Layer As Integer = 1) As Double
+    ' Check whether the dictionary is initialized
+    If cache Is Nothing Then
+        Call InitializeCache
+    End If
+    
+    Dim key As String
+    key = BuildCacheKey("Nx", Age, Sex, TableId, InterestRate, BirthYear, RetirementAge, Layer)
+    
+    ' Check whether the value is already cached
+    If cache.Exists(key) Then
+        Act_Nx = cache(key)
+    Else
+        Dim vec As Variant
+        vec = Vec_Nx(Sex, TableId, InterestRate, BirthYear, RetirementAge, Layer)
+        Act_Nx = vec(Age)
+        
+        ' Store result in cache
+        cache.Add key, Act_Nx
+    End If
+End Function
+
+
+Private Function Vec_Mx(Sex As String, TableId As String, InterestRate As Double, Optional BirthYear As Integer, Optional RetirementAge As Integer, Optional Layer As Integer = 1) As Variant
+    ' Creates vector of Mx
+    Dim vec() As Variant
+    Dim i As Integer
+    ReDim vec(max_Age)
+    
+    Dim tempCx As Variant
+    tempCx = Vec_Cx(-1, Sex, TableId, InterestRate, BirthYear, RetirementAge, Layer)
+            
+    vec(max_Age) = tempCx(max_Age)
+    For i = max_Age - 1 To 0 Step -1
+        vec(i) = vec(i + 1) + tempCx(i)
+        vec(i) = WorksheetFunction.Round(vec(i), round_Mx)
+    Next i
+    
+    Vec_Mx = vec()
+End Function
+
+Public Function Act_Mx(Age As Integer, Sex As String, TableId As String, InterestRate As Double, Optional BirthYear As Integer, Optional RetirementAge As Integer, Optional Layer As Integer = 1) As Double
+    ' Check whether the dictionary is initialized
+    If cache Is Nothing Then
+        Call InitializeCache
+    End If
+    
+    Dim key As String
+    key = BuildCacheKey("Mx", Age, Sex, TableId, InterestRate, BirthYear, RetirementAge, Layer)
+    
+    ' Check whether the value is already cached
+    If cache.Exists(key) Then
+        Act_Mx = cache(key)
+    Else
+        Dim vec As Variant
+        vec = Vec_Mx(Sex, TableId, InterestRate, BirthYear, RetirementAge, Layer)
+        Act_Mx = vec(Age)
+        
+        ' Store result in cache
+        cache.Add key, Act_Mx
+    End If
+End Function
+
+
+Private Function Vec_Rx(Sex As String, TableId As String, InterestRate As Double, Optional BirthYear As Integer, Optional RetirementAge As Integer, Optional Layer As Integer = 1) As Variant
+    ' Creates vector of Rx
+    Dim vec() As Variant
+    Dim i As Integer
+    ReDim vec(max_Age)
+    
+    Dim tempMx As Variant
+    tempMx = Vec_Mx(Sex, TableId, InterestRate, BirthYear, RetirementAge, Layer)
+            
+    vec(max_Age) = tempMx(max_Age)
+    For i = max_Age - 1 To 0 Step -1
+        vec(i) = vec(i + 1) + tempMx(i)
+        vec(i) = WorksheetFunction.Round(vec(i), round_Rx)
+    Next i
+    
+    Vec_Rx = vec()
+End Function
+
+Public Function Act_Rx(Age As Integer, Sex As String, TableId As String, InterestRate As Double, Optional BirthYear As Integer, Optional RetirementAge As Integer, Optional Layer As Integer = 1) As Double
+    ' Check whether the dictionary is initialized
+    If cache Is Nothing Then
+        Call InitializeCache
+    End If
+    
+    Dim key As String
+    key = BuildCacheKey("Rx", Age, Sex, TableId, InterestRate, BirthYear, RetirementAge, Layer)
+    
+    ' Check whether the value is already cached
+    If cache.Exists(key) Then
+        Act_Rx = cache(key)
+    Else
+        Dim vec As Variant
+        vec = Vec_Rx(Sex, TableId, InterestRate, BirthYear, RetirementAge, Layer)
+        Act_Rx = vec(Age)
+        
+        ' Store result in cache
+        cache.Add key, Act_Rx
+    End If
+End Function
+
+
+Public Function Act_AgeCalculation(BirthDate As Date, ValuationDate As Date, Method As String) As Integer
+    ' Age calculation based on calendar-year method (K) or half-year method (H)
+    
+    If Method <> "K" Then Method = "H"
+    
+    Dim yBirth As Integer
+    Dim yVal As Integer
+    Dim mBirth As Integer
+    Dim mVal As Integer
+
+    yBirth = Year(BirthDate)
+    yVal = Year(ValuationDate)
+    mBirth = Month(BirthDate)
+    mVal = Month(ValuationDate)
+
+    Select Case Method
+        Case "K"
+            Act_AgeCalculation = yVal - yBirth
+        Case "H"
+            Act_AgeCalculation = Int(yVal - yBirth + 1# / 12# * (mVal - mBirth + 5))
+    End Select
+End Function
+
+
+Private Function BuildCacheKey(Kind As String, Age As Integer, Sex As String, TableId As String, InterestRate As Double, BirthYear As Integer, RetirementAge As Integer, Layer As Integer) As String
+    BuildCacheKey = Kind & "_" & Age & "_" & Sex & "_" & TableId & "_" & InterestRate & "_" & BirthYear & "_" & RetirementAge & "_" & Layer
+End Function
+
